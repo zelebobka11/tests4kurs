@@ -1,0 +1,158 @@
+src/test/java/ru/conscious/api/IncidentsApiTest.java
+
+package ru.conscious.api;
+
+import io.restassured.http.ContentType;
+import org.junit.jupiter.api.Test;
+import ru.conscious.AuthClient;
+import ru.conscious.BaseApiTest;
+import ru.conscious.TestData;
+
+import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.*;
+
+public class IncidentsApiTest extends BaseApiTest {
+
+  @Test
+  void createIncident_ok_201() {
+    var u = user();
+    var req = new IncidentCreate(
+      "parking",
+      "Неправильная парковка",
+      "Авто стоит на тротуаре",
+      53.206083, 50.133565,
+      "Самара, проспект Ленина, 1",
+      "published"
+    );
+
+    given()
+      .header("Authorization", "Bearer " + u.token)
+      .contentType(ContentType.JSON)
+      .body(req)
+    .when()
+      .post("/api/incidents")
+    .then()
+      .statusCode(201)
+      .body("id", notNullValue())
+      .body("status", equalTo("published"));
+  }
+
+  @Test
+  void createIncident_missingTitle_400() {
+    var u = user();
+    var req = new IncidentCreate(
+      "parking",
+      null,
+      "text",
+      53.2, 50.1,
+      "addr",
+      "published"
+    );
+
+    given()
+      .header("Authorization", "Bearer " + u.token)
+      .contentType(ContentType.JSON)
+      .body(req)
+    .when()
+      .post("/api/incidents")
+    .then()
+      .statusCode(400);
+  }
+
+  @Test
+  void createDraft_ok_201_statusDraft() {
+    var u = user();
+    var req = new IncidentCreate(
+      "products",
+      "Просрочка в магазине",
+      "На полке просроченные товары",
+      53.2, 50.1,
+      "Самара, ...",
+      "draft"
+    );
+
+    given()
+      .header("Authorization", "Bearer " + u.token)
+      .contentType(ContentType.JSON)
+      .body(req)
+    .when()
+      .post("/api/incidents")
+    .then()
+      .statusCode(201)
+      .body("status", equalTo("draft"));
+  }
+
+  @Test
+  void myIncidents_returnsOnlyMine_200() {
+    var u1 = user();
+    var u2 = user();
+
+    // u1 creates
+    createIncident(u1.token, "parking", "t1");
+    // u2 creates
+    createIncident(u2.token, "parking", "t2");
+
+    given()
+      .header("Authorization", "Bearer " + u1.token)
+    .when()
+      .get("/api/incidents/my")
+    .then()
+      .statusCode(200)
+      .body("items.title", hasItem("t1"))
+      .body("items.title", not(hasItem("t2")));
+  }
+
+  @Test
+  void cannotAccessOthersIncident_403_or_404() {
+    var u1 = user();
+    var u2 = user();
+
+    Long id = createIncident(u1.token, "parking", "private").id;
+
+    // u2 пытается читать инцидент u1
+    given()
+      .header("Authorization", "Bearer " + u2.token)
+    .when()
+      .get("/api/incidents/" + id)
+    .then()
+      .statusCode(anyOf(is(403), is(404)));
+  }
+
+  private Created createIncident(String token, String category, String title) {
+    var req = new IncidentCreate(
+      category, title, "desc", 53.2, 50.1, "Самара", "published"
+    );
+    Long id = given()
+      .header("Authorization", "Bearer " + token)
+      .contentType(ContentType.JSON)
+      .body(req)
+    .when()
+      .post("/api/incidents")
+    .then()
+      .statusCode(201)
+      .extract().path("id");
+    return new Created(id);
+  }
+
+  private UserCtx user() {
+    String login = TestData.randLogin();
+    String email = TestData.randEmail();
+    String pass = TestData.strongPassword();
+    AuthClient.register(login, email, pass);
+    String token = AuthClient.loginAndGetToken(login, pass);
+    return new UserCtx(token);
+  }
+
+  record UserCtx(String token) {}
+  record Created(Long id) {}
+
+  record IncidentCreate(
+    String category,
+    String title,
+    String description,
+    double latitude,
+    double longitude,
+    String address,
+    String status
+  ) {}
+}
