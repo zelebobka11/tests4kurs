@@ -1,0 +1,73 @@
+mvn -q -DskipTests test
+# при первом запуске Playwright сам предложит установить браузеры
+src/test/java/ru/conscious/e2e/SmokeE2ETest.java
+package ru.conscious.e2e;
+
+import com.microsoft.playwright.*;
+import org.junit.jupiter.api.*;
+
+import ru.conscious.TestData;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+public class SmokeE2ETest {
+  static Playwright playwright;
+  static Browser browser;
+
+  BrowserContext context;
+  Page page;
+
+  String FRONT_URL = System.getProperty("frontUrl", "http://localhost:5173");
+
+  @BeforeAll
+  static void beforeAll() {
+    playwright = Playwright.create();
+    browser = playwright.chromium().launch(new BrowserType.LaunchOptions().setHeadless(true));
+  }
+
+  @AfterAll
+  static void afterAll() {
+    browser.close();
+    playwright.close();
+  }
+
+  @BeforeEach
+  void beforeEach() {
+    context = browser.newContext();
+    page = context.newPage();
+  }
+
+  @AfterEach
+  void afterEach() {
+    context.close();
+  }
+
+  @Test
+  void smoke_register_login_openMap() {
+    String login = TestData.randLogin();
+    String email = TestData.randEmail();
+    String pass  = "P@ssw0rd123!";
+
+    page.navigate(FRONT_URL);
+
+    // ПРИМЕЧАНИЕ: селекторы подстроить под реальные текст/лейблы
+    page.getByRole(AriaRole.LINK, new Page.GetByRoleOptions().setName("Зарегистрироваться")).click();
+    page.getByLabel("Логин").fill(login);
+    page.getByLabel("E-mail").fill(email);
+    page.getByLabel("Пароль").fill(pass);
+    page.getByLabel("Подтверждение пароля").fill(pass);
+    page.getByRole(AriaRole.CHECKBOX, new Page.GetByRoleOptions().setName("Согласие с правилами")).check();
+    page.getByRole(AriaRole.BUTTON, new Page.GetByRoleOptions().setName("Зарегистрироваться")).click();
+
+    // Проверка, что попали на экран рубрик
+    assertThat(page.getByText("Рубрики").isVisible()).isTrue();
+
+    // Переход к карте через рубрику
+    page.getByRole(AriaRole.BUTTON, new Page.GetByRoleOptions().setName("Неправильная парковка")).click();
+
+    // карта
+    assertThat(page.locator("#map").isVisible()).isTrue();
+  }
+}
+
+
