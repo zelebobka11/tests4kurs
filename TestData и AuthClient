@@ -1,0 +1,52 @@
+src/test/java/ru/conscious/TestData.java
+package ru.conscious;
+
+import java.util.UUID;
+
+public class TestData {
+  public static String randLogin() {
+    return "user_" + UUID.randomUUID().toString().replace("-", "").substring(0, 10);
+  }
+
+  public static String randEmail() {
+    return "t_" + UUID.randomUUID().toString().substring(0, 8) + "@example.com";
+  }
+
+  public static String strongPassword() {
+    return "P@ssw0rd_" + UUID.randomUUID().toString().substring(0, 6);
+  }
+}
+src/test/java/ru/conscious/AuthClient.java
+package ru.conscious;
+
+import io.restassured.http.ContentType;
+
+import static io.restassured.RestAssured.given;
+
+public class AuthClient {
+
+  public static void register(String login, String email, String password) {
+    given()
+      .contentType(ContentType.JSON)
+      .body(new RegisterReq(login, email, password))
+    .when()
+      .post("/api/auth/register")
+    .then()
+      .statusCode(201);
+  }
+
+  public static String loginAndGetToken(String login, String password) {
+    return given()
+      .contentType(ContentType.JSON)
+      .body(new LoginReq(login, password))
+    .when()
+      .post("/api/auth/login")
+    .then()
+      .statusCode(200)
+      .extract()
+      .path("token");
+  }
+
+  public record RegisterReq(String login, String email, String password) {}
+  public record LoginReq(String login, String password) {}
+}
