@@ -1,0 +1,66 @@
+src/test/java/ru/conscious/api/AdminApiTest.java
+package ru.conscious.api;
+
+import org.junit.jupiter.api.Test;
+import ru.conscious.AuthClient;
+import ru.conscious.BaseApiTest;
+import ru.conscious.TestData;
+
+import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.*;
+
+public class AdminApiTest extends BaseApiTest {
+
+  @Test
+  void adminEndpoints_forbiddenForUser_403() {
+    var user = createUser();
+    given()
+      .header("Authorization", "Bearer " + user.token)
+    .when()
+      .get("/api/admin/incidents")
+    .then()
+      .statusCode(403);
+  }
+
+  @Test
+  void adminEndpoints_allowedForAdmin_200() {
+    String adminLogin = System.getProperty("adminLogin", "admin");
+    String adminPass  = System.getProperty("adminPass", "admin");
+
+    String token = AuthClient.loginAndGetToken(adminLogin, adminPass);
+
+    given()
+      .header("Authorization", "Bearer " + token)
+    .when()
+      .get("/api/admin/incidents")
+    .then()
+      .statusCode(200)
+      .body("items", notNullValue());
+  }
+
+  @Test
+  void adminStats_ok_200() {
+    String adminLogin = System.getProperty("adminLogin", "admin");
+    String adminPass  = System.getProperty("adminPass", "admin");
+    String token = AuthClient.loginAndGetToken(adminLogin, adminPass);
+
+    given()
+      .header("Authorization", "Bearer " + token)
+    .when()
+      .get("/api/admin/stats")
+    .then()
+      .statusCode(200)
+      .body("byCategory", notNullValue());
+  }
+
+  private UserCtx createUser() {
+    String login = TestData.randLogin();
+    String email = TestData.randEmail();
+    String pass = TestData.strongPassword();
+    AuthClient.register(login, email, pass);
+    String token = AuthClient.loginAndGetToken(login, pass);
+    return new UserCtx(token);
+  }
+
+  record UserCtx(String token) {}
+}
