@@ -1,0 +1,108 @@
+src/test/java/ru/conscious/api/AuthApiTest.java
+
+package ru.conscious.api;
+
+import io.restassured.http.ContentType;
+import org.junit.jupiter.api.Test;
+import ru.conscious.BaseApiTest;
+import ru.conscious.TestData;
+
+import static io.restassured.RestAssured.given;
+
+public class AuthApiTest extends BaseApiTest {
+
+  @Test
+  void register_ok_201() {
+    String login = TestData.randLogin();
+    String email = TestData.randEmail();
+    String pass = TestData.strongPassword();
+
+    given()
+      .contentType(ContentType.JSON)
+      .body(new Req(login, email, pass))
+    .when()
+      .post("/api/auth/register")
+    .then()
+      .statusCode(201);
+  }
+
+  @Test
+  void register_duplicateLogin_409() {
+    String login = TestData.randLogin();
+    String email1 = TestData.randEmail();
+    String email2 = TestData.randEmail();
+    String pass = TestData.strongPassword();
+
+    given().contentType(ContentType.JSON).body(new Req(login, email1, pass))
+      .when().post("/api/auth/register").then().statusCode(201);
+
+    given().contentType(ContentType.JSON).body(new Req(login, email2, pass))
+      .when().post("/api/auth/register").then().statusCode(409);
+  }
+
+  @Test
+  void register_invalidLogin_containsAt_400() {
+    given()
+      .contentType(ContentType.JSON)
+      .body(new Req("bad@login", TestData.randEmail(), TestData.strongPassword()))
+    .when()
+      .post("/api/auth/register")
+    .then()
+      .statusCode(400);
+  }
+
+  @Test
+  void register_invalidLogin_space_400() {
+    given()
+      .contentType(ContentType.JSON)
+      .body(new Req("bad login", TestData.randEmail(), TestData.strongPassword()))
+    .when()
+      .post("/api/auth/register")
+    .then()
+      .statusCode(400);
+  }
+
+  @Test
+  void register_invalidEmail_400() {
+    given()
+      .contentType(ContentType.JSON)
+      .body(new Req(TestData.randLogin(), "a..b@example.com", TestData.strongPassword()))
+    .when()
+      .post("/api/auth/register")
+    .then()
+      .statusCode(400);
+  }
+
+  @Test
+  void login_ok_200_andToken() {
+    String login = TestData.randLogin();
+    String email = TestData.randEmail();
+    String pass = TestData.strongPassword();
+
+    given().contentType(ContentType.JSON).body(new Req(login, email, pass))
+      .when().post("/api/auth/register").then().statusCode(201);
+
+    given().contentType(ContentType.JSON).body(new Login(login, pass))
+      .when().post("/api/auth/login")
+      .then()
+        .statusCode(200)
+        .body("token", org.hamcrest.Matchers.notNullValue());
+  }
+
+  @Test
+  void login_wrongPassword_401() {
+    String login = TestData.randLogin();
+    String email = TestData.randEmail();
+    String pass = TestData.strongPassword();
+
+    given().contentType(ContentType.JSON).body(new Req(login, email, pass))
+      .when().post("/api/auth/register").then().statusCode(201);
+
+    given().contentType(ContentType.JSON).body(new Login(login, "WrongPass123!"))
+      .when().post("/api/auth/login")
+      .then().statusCode(401);
+  }
+
+  public record Req(String login, String email, String password) {}
+  public record Login(String login, String password) {}
+}
