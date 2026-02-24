@@ -1,0 +1,98 @@
+src/test/java/ru/conscious/api/PhotoUploadApiTest.java
+
+package ru.conscious.api;
+
+import org.junit.jupiter.api.Test;
+import ru.conscious.AuthClient;
+import ru.conscious.BaseApiTest;
+import ru.conscious.TestData;
+
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.notNullValue;
+
+public class PhotoUploadApiTest extends BaseApiTest {
+
+  @Test
+  void uploadPhoto_ok_200() throws Exception {
+    var u = user();
+    long incidentId = createIncident(u.token);
+
+    File img = createTempPng();
+
+    given()
+      .header("Authorization", "Bearer " + u.token)
+      .multiPart("photo", img, "image/png")
+    .when()
+      .post("/api/incidents/" + incidentId + "/photos")
+    .then()
+      .statusCode(200)
+      .body("photoId", notNullValue());
+  }
+
+  @Test
+  void uploadPhoto_invalidFormat_400() throws Exception {
+    var u = user();
+    long incidentId = createIncident(u.token);
+
+    File txt = createTempText();
+
+    given()
+      .header("Authorization", "Bearer " + u.token)
+      .multiPart("photo", txt, "text/plain")
+    .when()
+      .post("/api/incidents/" + incidentId + "/photos")
+    .then()
+      .statusCode(400);
+  }
+
+  private File createTempPng() throws Exception {
+    // минимальный валидный PNG "заголовок", для тестов
+    byte[] pngHeader = new byte[] {(byte)0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
+    Path p = Files.createTempFile("t_", ".png");
+    Files.write(p, pngHeader);
+    return p.toFile();
+  }
+
+  private File createTempText() throws Exception {
+    Path p = Files.createTempFile("t_", ".txt");
+    Files.writeString(p, "not an image");
+    return p.toFile();
+  }
+
+  private long createIncident(String token) {
+    return given()
+      .header("Authorization", "Bearer " + token)
+      .contentType("application/json")
+      .body("""
+        {
+          "category":"parking",
+          "title":"Фото тест",
+          "description":"desc",
+          "latitude":53.2,
+          "longitude":50.1,
+          "address":"Самара",
+          "status":"published"
+        }
+      """)
+    .when()
+      .post("/api/incidents")
+    .then()
+      .statusCode(201)
+      .extract().path("id");
+  }
+
+  private UserCtx user() {
+    String login = TestData.randLogin();
+    String email = TestData.randEmail();
+    String pass = TestData.strongPassword();
+    AuthClient.register(login, email, pass);
+    String token = AuthClient.loginAndGetToken(login, pass);
+    return new UserCtx(token);
+  }
+
+  record UserCtx(String token) {}
+}
