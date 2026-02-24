@@ -1,0 +1,118 @@
+src/test/java/ru/conscious/api/EmailApiTest.java
+
+package ru.conscious.api;
+
+import org.junit.jupiter.api.Test;
+import ru.conscious.AuthClient;
+import ru.conscious.BaseApiTest;
+import ru.conscious.TestData;
+
+import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.anyOf;
+import static org.hamcrest.Matchers.is;
+
+public class EmailApiTest extends BaseApiTest {
+
+  @Test
+  void sendEmail_requiresAuth_401() {
+    given()
+      .when()
+      .post("/api/incidents/1/send-email")
+      .then()
+      .statusCode(401);
+  }
+
+  @Test
+  void sendEmail_ok_200_or_202() {
+    var u = user();
+    long id = createIncident(u.token);
+
+    given()
+      .header("Authorization", "Bearer " + u.token)
+    .when()
+      .post("/api/incidents/" + id + "/send-email")
+    .then()
+      .statusCode(anyOf(is(200), is(202)));
+  }
+
+  private long createIncident(String token) {
+    return given()
+      .header("Authorization", "Bearer " + token)
+      .contentType("application/json")
+      .body("""
+        {"category":"parking","title":"EMAIL","description":"desc","latitude":53.2,"longitude":50.1,"address":"Самара","status":"published"}
+      """)
+    .when().post("/api/incidents")
+    .then().statusCode(201)
+    .extract().path("id");
+  }
+
+  private UserCtx user() {
+    String login = TestData.randLogin();
+    String email = TestData.randEmail();
+    String pass = TestData.strongPassword();
+    AuthClient.register(login, email, pass);
+    String token = AuthClient.loginAndGetToken(login, pass);
+    return new UserCtx(token);
+  }
+
+  record UserCtx(String token) {}
+}
+package ru.conscious.api;
+
+import org.junit.jupiter.api.Test;
+import ru.conscious.AuthClient;
+import ru.conscious.BaseApiTest;
+import ru.conscious.TestData;
+
+import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.anyOf;
+import static org.hamcrest.Matchers.is;
+
+public class EmailApiTest extends BaseApiTest {
+
+  @Test
+  void sendEmail_requiresAuth_401() {
+    given()
+      .when()
+      .post("/api/incidents/1/send-email")
+      .then()
+      .statusCode(401);
+  }
+
+  @Test
+  void sendEmail_ok_200_or_202() {
+    var u = user();
+    long id = createIncident(u.token);
+
+    given()
+      .header("Authorization", "Bearer " + u.token)
+    .when()
+      .post("/api/incidents/" + id + "/send-email")
+    .then()
+      .statusCode(anyOf(is(200), is(202)));
+  }
+
+  private long createIncident(String token) {
+    return given()
+      .header("Authorization", "Bearer " + token)
+      .contentType("application/json")
+      .body("""
+        {"category":"parking","title":"EMAIL","description":"desc","latitude":53.2,"longitude":50.1,"address":"Самара","status":"published"}
+      """)
+    .when().post("/api/incidents")
+    .then().statusCode(201)
+    .extract().path("id");
+  }
+
+  private UserCtx user() {
+    String login = TestData.randLogin();
+    String email = TestData.randEmail();
+    String pass = TestData.strongPassword();
+    AuthClient.register(login, email, pass);
+    String token = AuthClient.loginAndGetToken(login, pass);
+    return new UserCtx(token);
+  }
+
+  record UserCtx(String token) {}
+}
