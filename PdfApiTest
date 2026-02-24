@@ -1,0 +1,68 @@
+src/test/java/ru/conscious/api/PdfApiTest.java
+
+package ru.conscious.api;
+
+import org.junit.jupiter.api.Test;
+import ru.conscious.AuthClient;
+import ru.conscious.BaseApiTest;
+import ru.conscious.TestData;
+
+import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.*;
+
+public class PdfApiTest extends BaseApiTest {
+
+  @Test
+  void generatePdf_ok_returnsPdfBytes() {
+    var u = user();
+    long id = createIncident(u.token);
+
+    byte[] bytes =
+      given()
+        .header("Authorization", "Bearer " + u.token)
+      .when()
+        .get("/api/incidents/" + id + "/document")
+      .then()
+        .statusCode(200)
+        .header("Content-Type", containsString("application/pdf"))
+        .extract()
+        .asByteArray();
+
+    // PDF обычно начинается с "%PDF"
+    String start = new String(bytes, 0, Math.min(bytes.length, 4));
+    org.assertj.core.api.Assertions.assertThat(start).contains("%PDF");
+    org.assertj.core.api.Assertions.assertThat(bytes.length).isGreaterThan(200);
+  }
+
+  @Test
+  void generatePdf_requiresAuth_401() {
+    given()
+      .when()
+      .get("/api/incidents/1/document")
+      .then()
+      .statusCode(401);
+  }
+
+  private long createIncident(String token) {
+    return given()
+      .header("Authorization", "Bearer " + token)
+      .contentType("application/json")
+      .body("""
+        {"category":"parking","title":"PDF","description":"desc","latitude":53.2,"longitude":50.1,"address":"Самара","status":"published"}
+      """)
+    .when().post("/api/incidents")
+    .then().statusCode(201)
+    .extract().path("id");
+  }
+
+  private UserCtx user() {
+    String login = TestData.randLogin();
+    String email = TestData.randEmail();
+    String pass = TestData.strongPassword();
+    AuthClient.register(login, email, pass);
+    String token = AuthClient.loginAndGetToken(login, pass);
+    return new UserCtx(token);
+  }
+
+  record UserCtx(String token) {}
+}
