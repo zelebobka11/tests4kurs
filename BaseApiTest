@@ -1,0 +1,15 @@
+src/test/java/ru/conscious/BaseApiTest.java
+package ru.conscious;
+
+import io.restassured.RestAssured;
+import org.junit.jupiter.api.BeforeAll;
+
+public abstract class BaseApiTest {
+  protected static String BASE_URL = System.getProperty("baseUrl", "http://localhost:3000");
+
+  @BeforeAll
+  static void setup() {
+    RestAssured.baseURI = BASE_URL;
+    RestAssured.enableLoggingOfRequestAndResponseIfValidationFails();
+  }
+}
