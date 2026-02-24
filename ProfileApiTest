@@ -1,0 +1,105 @@
+src/test/java/ru/conscious/api/ProfileApiTest.java
+package ru.conscious.api;
+
+import io.restassured.http.ContentType;
+import org.junit.jupiter.api.Test;
+import ru.conscious.AuthClient;
+import ru.conscious.BaseApiTest;
+import ru.conscious.TestData;
+
+import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.*;
+
+public class ProfileApiTest extends BaseApiTest {
+
+  @Test
+  void profile_requiresAuth_401() {
+    given().when().get("/api/profile").then().statusCode(401);
+  }
+
+  @Test
+  void profile_get_ok_200() {
+    var u = createUser();
+    given()
+      .header("Authorization", "Bearer " + u.token)
+    .when()
+      .get("/api/profile")
+    .then()
+      .statusCode(200)
+      .body("login", equalTo(u.login))
+      .body("email", equalTo(u.email));
+  }
+
+  @Test
+  void profile_update_ok_200() {
+    var u = createUser();
+
+    var req = new ProfileUpdate(
+      "Иванов", "Иван", "Иванович",
+      "+7 999 111 22 33",
+      "Самара", "Ленина", "1", "10"
+    );
+
+    given()
+      .header("Authorization", "Bearer " + u.token)
+      .contentType(ContentType.JSON)
+      .body(req)
+    .when()
+      .put("/api/profile")
+    .then()
+      .statusCode(200)
+      .body("surname", equalTo("Иванов"))
+      .body("city", equalTo("Самара"));
+  }
+
+  @Test
+  void profile_update_invalidSurnameLatin_400() {
+    var u = createUser();
+    var req = new ProfileUpdate(
+      "Ivanov", "Иван", null, "+7 999 111 22 33",
+      "Самара", "Ленина", "1", null
+    );
+
+    given()
+      .header("Authorization", "Bearer " + u.token)
+      .contentType(ContentType.JSON)
+      .body(req)
+    .when()
+      .put("/api/profile")
+    .then()
+      .statusCode(400);
+  }
+
+  @Test
+  void profile_update_invalidPhone_400() {
+    var u = createUser();
+    var req = new ProfileUpdate(
+      "Иванов", "Иван", null, "ABC",
+      "Самара", "Ленина", "1", null
+    );
+
+    given()
+      .header("Authorization", "Bearer " + u.token)
+      .contentType(ContentType.JSON)
+      .body(req)
+    .when()
+      .put("/api/profile")
+    .then()
+      .statusCode(400);
+  }
+
+  private UserCtx createUser() {
+    String login = TestData.randLogin();
+    String email = TestData.randEmail();
+    String pass = TestData.strongPassword();
+    AuthClient.register(login, email, pass);
+    String token = AuthClient.loginAndGetToken(login, pass);
+    return new UserCtx(login, email, token);
+  }
+
+  record UserCtx(String login, String email, String token) {}
+  record ProfileUpdate(
+    String surname, String name, String patronymic,
+    String phone, String city, String street, String house, String flat
+  ) {}
+}
